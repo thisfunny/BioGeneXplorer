@@ -1,230 +1,244 @@
 # BioGeneXplorer
 
-**A modular Python tool for integrated gene and genome analysis**  
-Uses BLAST+ and MySQL to detect gene presence, filter duplicates, and produce summary statistics — all offline.
+Welcome to **BioGeneXplorer**, a user-friendly tool for analyzing gene sequences and preparing submissions to NCBI (National Center for Biotechnology Information).
+
+This guide assumes no prior experience with Python, MySQL, or command-line tools. We’ll walk you through every step so you can get started quickly.
 
 ---
 
 ## Table of Contents
 
-- [Features](#features)  
-- [Requirements](#requirements)  
-- [Installation](#installation)  
-- [Configuration](#configuration)  
-- [Directory Structure](#directory-structure)  
-- [Input Data](#input-data)  
-- [Running the Pipeline](#running-the-pipeline)  
-- [Output Files](#output-files)  
-- [Code Modules](#code-modules)  
-- [Contributing](#contributing)  
-- [License](#license)  
+- [Features](#features)
+- [What You’ll Need](#what-youll-need)
+- [Dependencies](#dependencies)
+- [Download & Setup](#download--setup)
+- [Configure Your Project](#configure-your-project)
+- [Project Structure](#project-structure)
+- [Code Modules](#code-modules)
+- [How to Organize Your Files](#how-to-organize-your-files)
+- [Running BioGeneXplorer](#running-biogenexplorer)
+  - [Using Command Line](#using-command-line)
+  - [Using PyCharm (Graphical Interface)](#using-pycharm-graphical-interface)
+- [Understanding Inputs & Outputs](#understanding-inputs--outputs)
+- [Troubleshooting Tips](#troubleshooting-tips)
+- [Advanced Configuration](#advanced-configuration)
+- [Performance Note](#performance-note)
+- [License](#license)
 
 ---
 
 ## Features
 
-- **Automated file management:** Scans your gene/genome folders and syncs to a MySQL database.  
-- **Offline BLAST:** Builds a local nucleotide database and runs `blastn` on each gene.  
-- **Dynamic cutoffs:** Filters hits by identity (e.g. ≥85%) and coverage (e.g. ≥90%).  
-- **Duplicate detection:** Pairwise BLAST comparisons flag near-identical sequences.  
-- **Statistical reporting:** Aggregates gene-presence, cutoff, duplicate, and diversity metrics.  
-- **Exports:** Writes results as Excel (and CSV/JSON if desired) for downstream analysis.
+- **Duplicate Detection** — Identify and filter duplicate gene entries.
+- **Statistical Analysis** — Generate statistical summaries of sequence data.
+- **Sequence Alignment** — Compare gene sequences using built-in alignment scripts.
+- **Automated Submission** — Prepare and submit sequence data to NCBI seamlessly.
+- **Extensible Modules** — Support for future charting and phylogenetic tree generation.
 
----
+## What You’ll Need
 
-## Requirements
+1. **A computer running Windows, macOS, or Linux**
+2. **Python 3.7 or higher**
+3. **MySQL Server**
+4. **BioGeneXplorer code** — Downloadable from GitHub.
 
-- **Python 3.7+**  
-- **MySQL server** (client must allow connections with your `root` or specified user)  
-- **BLAST+ (NCBI)** in your `$PATH` (`makeblastdb`, `blastn`)  
-- Python packages (install via `pip`):  
-  ```bash
-  pip install mysql-connector-python pandas
-  ```
+> If any of these terms are unfamiliar, don’t worry — we provide detailed steps below.
 
----
+## Dependencies
 
-## Installation
+BioGeneXplorer relies on several Python libraries:
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/BioGeneXplorer.git
-   cd BioGeneXplorer
-   ```
+- **Biopython** — For reading and handling sequence files
+- **pandas** — For data tables and CSV/JSON output
+- **matplotlib** — For generating charts (in future modules)
 
-2. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Install them all via:
 
-3. Ensure BLAST+ executables are installed and accessible:
-   ```bash
-   makeblastdb -version
-   blastn -version
-   ```
-
-4. Create your gene and genome sample folders (see [Input Data](#input-data)).
-
----
-
-## Configuration
-
-Open `model/DB/db_model.py` and edit the `self.db_info` dictionary in the `DB` class to match your MySQL credentials:
-
-```python
-self.db_info = {
-    'host':     'localhost',
-    'user':     'root',
-    'password': 'YOUR_DB_PASSWORD',
-    'database': 'wgs2'
-}
+```bash
+pip install -r requirements.txt
 ```
 
 ---
 
-## Directory Structure
+## Download & Setup
+
+### 1. Install Python
+
+- Visit [python.org](https://www.python.org/downloads/) and download the latest Python 3 installer.
+- On Windows, ensure you check **Add Python to PATH**.
+- Follow on-screen instructions.
+
+### 2. Install MySQL Server
+
+- **Windows**: Download MySQL Installer from [dev.mysql.com](https://dev.mysql.com/downloads/installer/) and choose “Developer Default.”
+- **macOS**: `brew install mysql`
+- **Linux (Ubuntu)**: `sudo apt-get install mysql-server`
+- Start MySQL:
+  - Windows: Start “MySQL80” service.
+  - macOS/Linux: `mysql.server start`
+
+### 3. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/BioGeneXplorer.git
+cd BioGeneXplorer
+```
+
+*(Or download ZIP and extract.)*
+
+### 4. Install Python Libraries
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Configure Your Project
+
+### MySQL Database Settings
+
+1. Open a MySQL client:
+   - Windows: MySQL Workbench
+   - macOS/Linux: `mysql -u root -p`
+2. Create database and user:
+   ```sql
+   CREATE DATABASE biogenexplorer;
+   CREATE USER 'bio_user'@'localhost' IDENTIFIED BY 'YourPassword';
+   GRANT ALL PRIVILEGES ON biogenexplorer.* TO 'bio_user'@'localhost';
+   ```
+3. Edit `model/DB/__init__.py`:
+   ```python
+   DB_CONFIG = {
+       'host': 'localhost',      # or your DB host
+       'port': 3306,             # or your DB port
+       'user': 'bio_user',       # your DB username
+       'password': 'YourPassword',
+       'database': 'biogenexplorer'
+   }
+   ```
+
+### NCBI Submission Settings
+
+Open `Submission/NCBI_submission.py` or `cfg.ini` and update:
+
+```ini
+[NCBI]
+api_url = https://api.ncbi.nlm.nih.gov/submit
+email   = your.email@example.com
+```
+
+Add more endpoints or emails as needed.
+
+---
+
+## Project Structure
 
 ```
 BioGeneXplorer/
-├── model/
-│   ├── BL/
-│   │   ├── MainProcess.py
-│   │   ├── StatisticalResultProcess.py
-│   │   └── DuplicateCheck.py
-│   ├── DB/
-│   │   └── db_model.py
-│   └── entity/
-│       ├── BLAST.py
-│       ├── BlastResults.py
-│       ├── Combine.py
-│       ├── Concatenate.py
-│       ├── Gene.py
-│       ├── WholeGenome.py
-│       └── StatisticalReport.py
-├── test.py             ← Main entry point
-├── results/            ← Generated at runtime
-│   ├── blast_results/  
-│   └── analysis_results/
-└── requirements.txt
+├── main.py                   # Entry point for analysis
+├── submission_test.py        # Tests for NCBI submission workflows
+├── model/                    # Core processing
+│   ├── BL/                   # DuplicateCheck, MainProcess, StatisticalResultProcess
+│   ├── DB/                   # MySQL connection (DB_CONFIG)
+│   ├── align/                # Alignment utilities
+│   └── future/               # GeneDiversityChart, phylogenetic tree
+├── Submission/               # NCBI submission scripts
+│   ├── NCBI_submission.py
+│   └── File_process/         # NCBI_file_process.py
+└── requirements.txt          # Python dependencies
 ```
-
----
-
-## Input Data
-
-- **Gene samples folder**  
-  A directory containing one or more FASTA files (`.fasta` or `.fas`) of individual gene sequences.  
-  Example:
-  ```
-  genes_sample/
-  ├── geneA.fasta
-  ├── geneB.fasta
-  └── geneC.fasta
-  ```
-
-- **Genome samples folder**  
-  A directory of whole-genome FASTA files.  
-  Example:
-  ```
-  whole_genome/
-  ├── genome1.fasta
-  ├── genome2.fasta
-  └── genome3.fasta
-  ```
-
-In `test.py`, set the paths:
-```python
-gene_sample_path   = r'path/to/genes_sample'
-genome_sample_path = r'path/to/whole_genome'
-```
-
----
-
-## Running the Pipeline
-
-From the repository root:
-
-```bash
-python test.py
-```
-
-By default, the script will:
-
-1. **(Re)create** the `results/` and `wgs/` folders.
-2. **Drop** the existing `wgs2` database (if `create_drop=True`), then recreate it.
-3. **Scan** your gene/genome folders and register files in MySQL.
-4. **Combine** genome FASTA files into `results/combined_wgs.fasta`.
-5. **Build** a local BLAST database (`wgs/WGS`).
-6. **Loop** through each gene:
-   - Run `blastn` against the combined genome DB.
-   - Create a gene-specific result table.
-   - Insert BLAST hits into MySQL.
-   - Update `cutoff` flags based on identity/coverage thresholds.
-   - Detect and flag duplicates.
-7. **Perform** statistical analysis across all genes.
-8. **Export** final reports to `results/analysis_results/statistical_result.xlsx` and `genome_gene.xlsx`.
-
----
-
-## Output Files
-
-- **results/combined_wgs.fasta**  
-  All genomes concatenated with modified headers (`>genomeName|originalHeader`).
-
-- **results/blast_results/**  
-  CSV files of raw BLAST hits for each gene, plus per-gene folders of query/subject FASTA dumps.
-
-- **results/analysis_results/statistical_result.xlsx**  
-  Excel report summarizing for each gene:  
-  - Total hits, gene-presence count & %, cutoff count & %, duplicate & diversity metrics.
-
-- **results/analysis_results/genome_gene.xlsx**  
-  Presence/absence matrix of genomes vs. genes (1 = present & passing cutoff).
 
 ---
 
 ## Code Modules
 
-- **`db_model.py`**  
-  MySQL connection, table creation, insertion, update, custom queries, and export.
-
-- **`Combine.py`**  
-  - `create_results_folder()`  
-  - `create_combined_wgs()` — embeds genome names in FASTA headers.
-
-- **`BLAST.py`**  
-  - `create_blast_database()`  
-  - `blast()` — runs `blastn` and writes CSV outputs.
-
-- **`DuplicateCheck.py`**  
-  - Pairwise BLAST of sequences flagged present.  
-  - Flags duplicates in the database.
-
-- **`StatisticalResultProcess.py`**  
-  - Aggregates data from gene tables.  
-  - Calculates and inserts statistics.
-
-- **`MainProcess.py`**  
-  Orchestrates the full workflow in `process()`.
-
-- **Entity classes (`Gene.py`, `WholeGenome.py`, etc.)**  
-  Simple data containers and JSON serializers for MySQL rows.
+- **model/BL/DuplicateCheck.py** — Filters duplicate gene sequences.
+- **model/BL/MainProcess.py** — Orchestrates the analysis pipeline.
+- **model/BL/StatisticalResultProcess.py** — Calculates counts, GC content, and other metrics.
+- **model/DB/****init****.py** — Defines `DB_CONFIG` and establishes MySQL connections.
+- **model/align/** — Scripts and wrappers for sequence alignment.
+- **model/future/**
+  - `GeneDiversityChart.py` — Generates diversity charts.
+  - `tree.py` — Builds phylogenetic trees.
+- **Submission/NCBI\_submission.py** — Sends prepared data to NCBI.
+- **Submission/File\_process/NCBI\_file\_process.py** — Formats files for submission.
 
 ---
 
-## Contributing
+## How to Organize Your Files
 
-1. Fork the repository.  
-2. Create a feature branch (`git checkout -b feature/my-feature`).  
-3. Commit your changes (`git commit -m 'Add new feature'`).  
-4. Push to your branch (`git push origin feature/my-feature`).  
-5. Open a pull request.
+Create two folders anywhere on your computer:
 
-Please ensure you update the README and add tests where applicable.
+```
+YourProjectFolder/
+├── Input_Genes/        # .txt and .fas files go here
+└── Output_Results/     # Generated statistics, submissions, and logs
+```
+
+---
+
+## Running BioGeneXplorer
+
+### Using Command Line
+
+```bash
+python main.py --input /full/path/to/Input_Genes \
+               --output /full/path/to/Output_Results
+```
+
+### Using PyCharm (GUI)
+
+1. Open the **BioGeneXplorer** folder.
+2. Set Python interpreter in **File > Settings > Project > Python Interpreter**.
+3. Add run configuration:
+   - Script: `main.py`
+   - Parameters: `--input /path/to/Input_Genes --output /path/to/Output_Results`
+   - Working dir: project root
+4. Click **Run**.
+
+---
+
+## Understanding Inputs & Outputs
+
+- **Inputs**:
+  - `.txt` files: Plain gene sequences.
+  - `.fas` files: FASTA-formatted whole-genome sequences.
+- **Outputs** (in `Output_Results/`):
+  - **statistics/** — CSV and JSON reports.
+  - **submissions/** — `.sqn` or XML files for NCBI.
+  - **logs/** — Detailed logs for each run.
+
+---
+
+## Troubleshooting Tips
+
+- **MySQL connection refused**: Verify service running and `DB_CONFIG` settings.
+- **Module not found**: Re-run `pip install -r requirements.txt`.
+- **Permission errors**: Run terminal/PyCharm as **Administrator** or **sudo**.
+- Check `Output_Results/logs/` for error details.
+
+---
+
+## Advanced Configuration
+
+You can extend or customize:
+
+- **Statistical processing**: `model/BL/StatisticalResultProcess.py`
+- **Alignment settings**: files under `model/align/`
+- **Charting & trees**: `model/future/`
+
+All scripts include comments for guidance.
+
+---
+
+## Performance Note
+
+BioGeneXplorer caches data locally. It runs significantly faster when **offline**, avoiding external network calls.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.  
-See [LICENSE](LICENSE) for details.
+This project is released under the [MIT License](LICENSE).
+
