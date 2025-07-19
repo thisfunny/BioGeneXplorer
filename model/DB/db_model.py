@@ -69,15 +69,15 @@ class DB:
         create_statistical_result_table_query = """
                 CREATE TABLE IF NOT EXISTS statistical_result (
                     gene_name VARCHAR(100) PRIMARY KEY,
-                    gene_presence_count INT,
-                    gene_presence_percentage FLOAT,
+                    Total_Count_of_Gene_Occurrence_Across_All_Isolates INT,
+                    Percentage_of_Gene_Occurrence_Across_All_Isolates FLOAT,
                     cutoff_count INT,
                     cutoff_percentage FLOAT,
-                    duplicate_count INT,
-                    duplicate_percentage FLOAT,
-                    diversity_count INT,
-                    diversity_percentage FLOAT,
-                    distinct_gene_presence_count INT
+                    Number_of_Repeated_Alleles INT,
+                    Percentage_of_Repeated_Alleles FLOAT,
+                    Number_of_Alleles INT,
+                    Percentage_of_Alleles FLOAT,
+                    Number_of_Isolates_Containing_Duplicate_Genes INT
 
                 )
                 """
@@ -268,31 +268,42 @@ class DB:
         self.connect()
         self.cursor.execute(create_table_query)
 
+    from pandas.errors import EmptyDataError
+
     def insert_blast_result(self, gene_name):
         insert_query = f"""
-                    INSERT INTO {gene_name} (query_id, genome_name, subject_id, identity, alignment_length,
-                                              mismatches, gap_opens, q_start, q_end, s_start, s_end, evalue, bit_score,
-                                              query_length, subject_length, subject_strand, query_frame, sbjct_frame, qseq_path, sseq_path, cutoff, duplicate)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
+            INSERT INTO {gene_name} (
+                query_id, genome_name, subject_id, identity, alignment_length,
+                mismatches, gap_opens, q_start, q_end, s_start, s_end, evalue,
+                bit_score, query_length, subject_length, subject_strand,
+                query_frame, sbjct_frame, qseq_path, sseq_path, cutoff, duplicate
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
 
-        base_folder_path = r"results\blast_results"
+        base_folder_path = "results/blast_results"
+        table_folder_path = gene_name
+        seq_folder_name = f"{gene_name}_seq_folder"
+        full_seq_path = os.path.join(base_folder_path, table_folder_path, seq_folder_name)
+        os.makedirs(full_seq_path, exist_ok=True)
 
-        table_folder_path = f"{gene_name}"
-        folder_path = f"{gene_name}_seq_folder"
-        full_path = os.path.join(base_folder_path, table_folder_path, folder_path)
-        os.makedirs(full_path, exist_ok=True)
+        # build and check CSV path
+        csv_path = os.path.join(base_folder_path, table_folder_path, f"{gene_name}.csv")
+        if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+            print(f"⚠️  No BLAST CSV found or it's empty at: {csv_path}. Skipping {gene_name}.")
+            return
 
-        df = pd.read_csv(fr'results/blast_results/{gene_name}/{gene_name}.csv', header=None)
+        try:
+            df = pd.read_csv(csv_path, header=None)
+        except:
+            print(f"⚠️  BLAST CSV at {csv_path} is empty. Skipping {gene_name}.")
+            return
 
+        # now proceed with DB insert as before
         self.connect()
-        # Iterate through each row in the DataFrame
         for idx, row in df.iterrows():
             query_id = row[1]
-
-            # Split the query_id by '|'
             parts = query_id.split('|')
-
             if len(parts) == 2:
                 genome_name, original_query_id = parts
             elif len(parts) > 2:
@@ -302,46 +313,28 @@ class DB:
                 print(f"Unexpected format in query_id: {query_id}")
                 continue
 
-            # Include genome_name in the file names
-            qseq_path = os.path.join(full_path, f"{gene_name}_{genome_name}_qseq_{idx}.fasta")
-            sseq_path = os.path.join(full_path, f"{gene_name}_{genome_name}_sseq_{idx}.fasta")
-
-            # Write sequences to the respective files
+            # write out the qseq/sseq FASTA files
+            qseq_path = os.path.join(full_seq_path, f"{gene_name}_{genome_name}_qseq_{idx}.fasta")
+            sseq_path = os.path.join(full_seq_path, f"{gene_name}_{genome_name}_sseq_{idx}.fasta")
             with open(qseq_path, 'w') as qf:
                 qf.write(row[17])
             with open(sseq_path, 'w') as sf:
                 sf.write(row[18])
 
-            # Prepare row data for insertion
             row_data = (
-                original_query_id,  # Original query ID
-                genome_name,  # Genome name
-                row[1],  # Subject ID (could be genome name as well)
-                row[2],  # Identity
-                row[3],  # Alignment Length
-                row[4],  # Mismatches
-                row[5],  # Gap Opens
-                row[6],  # q_start
-                row[7],  # q_end
-                row[8],  # s_start
-                row[9],  # s_end
-                row[10],  # evalue
-                row[11],  # bit_score
-                row[12],  # query_length
-                row[13],  # subject_length
-                row[14],  # subject_strand
-                row[15],  # query_frame
-                row[16],  # sbjct_frame
-                qseq_path,  # Path to qseq file
-                sseq_path,  # Path to sseq file
+                original_query_id,
+                genome_name,
+                row[1], row[2], row[3], row[4], row[5],
+                row[6], row[7], row[8], row[9], row[10],
+                row[11], row[12], row[13], row[14], row[15],
+                row[16],
+                qseq_path,
+                sseq_path,
                 0,
                 0
             )
-
-            # Connect to the database and execute the insert
             self.cursor.execute(insert_query, row_data)
 
-        # Commit and disconnect
         self.disconnect(commit=True)
 
     def execute_custom_query(self, query, commit=False):
@@ -383,29 +376,29 @@ class DB:
         self.cursor.execute(f"UPDATE {table_name} SET {updates} WHERE {condition}")
         self.disconnect(commit=True)
 
-    def search_distinct_gene_presence_count(self, table_name):
+    def search_Number_of_Isolates_Containing_Duplicate_Genes(self, table_name):
         self.connect()
         distinct_gene_presence_query = f"SELECT COUNT(DISTINCT genome_name) FROM {table_name} WHERE cutoff = 1"
         self.cursor.execute(distinct_gene_presence_query)
-        distinct_gene_presence_count = self.cursor.fetchone()
+        Number_of_Isolates_Containing_Duplicate_Genes = self.cursor.fetchone()
         self.disconnect()
-        return distinct_gene_presence_count[0]
+        return Number_of_Isolates_Containing_Duplicate_Genes[0]
 
-    def search_gene_presence_count(self, table_name):
+    def search_Total_Count_of_Gene_Occurrence_Across_All_Isolates(self, table_name):
         self.connect()
         cutoff_query = f"SELECT COUNT(*) FROM {table_name} WHERE cutoff = 1"
         self.cursor.execute(cutoff_query)
-        gene_presence_count = self.cursor.fetchone()
+        Total_Count_of_Gene_Occurrence_Across_All_Isolates = self.cursor.fetchone()
         self.disconnect()
-        return gene_presence_count[0]
+        return Total_Count_of_Gene_Occurrence_Across_All_Isolates[0]
 
     def search_duplicate_gene_count(self, table_name):
         self.connect()
         duplicate_query = f"SELECT COUNT(*) FROM {table_name} WHERE duplicate = 1"
         self.cursor.execute(duplicate_query)
-        diversity_count = self.cursor.fetchone()
+        Number_of_Alleles = self.cursor.fetchone()
         self.disconnect()
-        return diversity_count[0]
+        return Number_of_Alleles[0]
 
     def search_all_genes(self):
         self.connect()
@@ -537,18 +530,18 @@ class DB:
 
     def insert_statistical_result_table(self, statistical_report):
         insert_query = """
-                    INSERT INTO statistical_result (gene_name, cutoff_count, cutoff_percentage, duplicate_count, duplicate_percentage, gene_presence_count, gene_presence_percentage, diversity_count, diversity_percentage, distinct_gene_presence_count)
+                    INSERT INTO statistical_result (gene_name, cutoff_count, cutoff_percentage, Number_of_Repeated_Alleles, Percentage_of_Repeated_Alleles, Total_Count_of_Gene_Occurrence_Across_All_Isolates, Percentage_of_Gene_Occurrence_Across_All_Isolates, Number_of_Alleles, Percentage_of_Alleles, Number_of_Isolates_Containing_Duplicate_Genes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                     cutoff_count = VALUES(cutoff_count),
                     cutoff_percentage = VALUES(cutoff_percentage),
-                    duplicate_count = VALUES(duplicate_count),
-                    duplicate_percentage = VALUES(duplicate_percentage),
-                    gene_presence_count = VALUES(gene_presence_count),
-                    gene_presence_percentage = VALUES(gene_presence_percentage),
-                    diversity_count = VALUES(diversity_count),
-                    diversity_percentage = VALUES(diversity_percentage),
-                    distinct_gene_presence_count = VALUES(distinct_gene_presence_count)
+                    Number_of_Repeated_Alleles = VALUES(Number_of_Repeated_Alleles),
+                    Percentage_of_Repeated_Alleles = VALUES(Percentage_of_Repeated_Alleles),
+                    Total_Count_of_Gene_Occurrence_Across_All_Isolates = VALUES(Total_Count_of_Gene_Occurrence_Across_All_Isolates),
+                    Percentage_of_Gene_Occurrence_Across_All_Isolates = VALUES(Percentage_of_Gene_Occurrence_Across_All_Isolates),
+                    Number_of_Alleles = VALUES(Number_of_Alleles),
+                    Percentage_of_Alleles = VALUES(Percentage_of_Alleles),
+                    Number_of_Isolates_Containing_Duplicate_Genes = VALUES(Number_of_Isolates_Containing_Duplicate_Genes)
                     """
 
         self.connect()
@@ -633,4 +626,3 @@ class DB:
             self.cursor.execute(update_query)
             self.mydb.commit()
         self.disconnect(commit=True)
-

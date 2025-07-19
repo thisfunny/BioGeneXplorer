@@ -19,28 +19,28 @@ class StatisticalResultProcess:
             total_count = total_count[0]
             print("total_count", total_count)
 
-            gene_presence_count = self.db.search_gene_presence_count(table_name)
-            print("gene_presence_count", gene_presence_count)
-            distinct_gene_presence_count = self.db.search_distinct_gene_presence_count(table_name)
-            print("distinct_gene_presence_count", distinct_gene_presence_count)
-            cutoff_count = (total_blasts - gene_presence_count)
+            Total_Count_of_Gene_Occurrence_Across_All_Isolates = self.db.search_Total_Count_of_Gene_Occurrence_Across_All_Isolates(table_name)
+            print("Total_Count_of_Gene_Occurrence_Across_All_Isolates", Total_Count_of_Gene_Occurrence_Across_All_Isolates)
+            Number_of_Isolates_Containing_Duplicate_Genes = Total_Count_of_Gene_Occurrence_Across_All_Isolates - self.db.search_Number_of_Isolates_Containing_Duplicate_Genes(table_name)
+            print("Number_of_Isolates_Containing_Duplicate_Genes", Number_of_Isolates_Containing_Duplicate_Genes)
+            cutoff_count = (total_blasts - Total_Count_of_Gene_Occurrence_Across_All_Isolates)
             if total_blasts == 0:
                 continue
             else:
                 cutoff_percentage = (cutoff_count / total_blasts) * 100 if total_count else 0
-                gene_presence_percentage = (distinct_gene_presence_count / total_count) * 100 if total_count else 0
+                Percentage_of_Gene_Occurrence_Across_All_Isolates = (Number_of_Isolates_Containing_Duplicate_Genes / total_count) * 100 if total_count else 0
 
-            diversity_count = self.db.search_duplicate_gene_count(table_name)
-            duplicate_count = (gene_presence_count - diversity_count)
-            if gene_presence_count == 0:
+            Number_of_Alleles = self.db.search_duplicate_gene_count(table_name)
+            Number_of_Repeated_Alleles = (Total_Count_of_Gene_Occurrence_Across_All_Isolates - Number_of_Alleles)
+            if Total_Count_of_Gene_Occurrence_Across_All_Isolates == 0:
                 continue
             else:
-                duplicate_percentage = (duplicate_count / gene_presence_count) * 100 if total_count else 0
-                diversity_percentage = (diversity_count / gene_presence_count) * 100 if total_count else 0
+                Percentage_of_Repeated_Alleles = (Number_of_Repeated_Alleles / Total_Count_of_Gene_Occurrence_Across_All_Isolates) * 100 if total_count else 0
+                Percentage_of_Alleles = (Number_of_Alleles / Total_Count_of_Gene_Occurrence_Across_All_Isolates) * 100 if total_count else 0
 
             # Insert or update analysis results in gene_analysis table
-            statistical_report = StatisticalReport(table_name, cutoff_count, cutoff_percentage, duplicate_count, duplicate_percentage, gene_presence_count,
-            gene_presence_percentage, diversity_count, diversity_percentage, distinct_gene_presence_count)
+            statistical_report = StatisticalReport(table_name, cutoff_count, cutoff_percentage, Number_of_Repeated_Alleles, Percentage_of_Repeated_Alleles, Total_Count_of_Gene_Occurrence_Across_All_Isolates,
+            Percentage_of_Gene_Occurrence_Across_All_Isolates, Number_of_Alleles, Percentage_of_Alleles, Number_of_Isolates_Containing_Duplicate_Genes)
 
             self.db.insert_statistical_result_table(statistical_report)
 

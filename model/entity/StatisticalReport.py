@@ -1,19 +1,19 @@
 import json
 
 class StatisticalReport:
-    def __init__(self, gene_name, gene_presence_count, gene_presence_percentage, cutoff_count, cutoff_percentage,
-                 duplicate_count, duplicate_percentage, diversity_count, diversity_percentage,
-                 distinct_gene_presence_count):
+    def __init__(self, gene_name, Total_Count_of_Gene_Occurrence_Across_All_Isolates, Percentage_of_Gene_Occurrence_Across_All_Isolates, cutoff_count, cutoff_percentage,
+                 Number_of_Repeated_Alleles, Percentage_of_Repeated_Alleles, Number_of_Alleles, Percentage_of_Alleles,
+                 Number_of_Isolates_Containing_Duplicate_Genes):
         self.gene_name = gene_name
-        self.gene_presence_count = gene_presence_count
-        self.gene_presence_percentage = gene_presence_percentage
+        self.Total_Count_of_Gene_Occurrence_Across_All_Isolates = Total_Count_of_Gene_Occurrence_Across_All_Isolates
+        self.Percentage_of_Gene_Occurrence_Across_All_Isolates = Percentage_of_Gene_Occurrence_Across_All_Isolates
         self.cutoff_count = cutoff_count
         self.cutoff_percentage = cutoff_percentage
-        self.duplicate_count = duplicate_count
-        self.duplicate_percentage = duplicate_percentage
-        self.diversity_count = diversity_count
-        self.diversity_percentage = diversity_percentage
-        self.distinct_gene_presence_count = distinct_gene_presence_count
+        self.Number_of_Repeated_Alleles = Number_of_Repeated_Alleles
+        self.Percentage_of_Repeated_Alleles = Percentage_of_Repeated_Alleles
+        self.Number_of_Alleles = Number_of_Alleles
+        self.Percentage_of_Alleles = Percentage_of_Alleles
+        self.Number_of_Isolates_Containing_Duplicate_Genes = Number_of_Isolates_Containing_Duplicate_Genes
 
     def __repr__(self):
         return json.dumps(self.__dict__)
