@@ -58,6 +58,8 @@ To install all required packages, simply run:
 install.bat
 ```
 
+---
+
 ## Download & Setup
 
 ### 1. Install Python
