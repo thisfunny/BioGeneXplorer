@@ -48,14 +48,14 @@ This guide assumes no prior experience with Python, MySQL, or command-line tools
 
 BioGeneXplorer relies on several Python libraries:
 
-- **Biopython** — For reading and handling sequence files
 - **pandas** — For data tables and CSV/JSON output
 - **matplotlib** — For generating charts (in future modules)
+- **Biopython** — For reading and handling sequence files
 
-Install them all via:
+To install all required packages, simply run:
 
 ```bash
-pip install -r requirements.txt
+install.bat
 ```
 
 ---
